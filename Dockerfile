@@ -7,7 +7,7 @@ ENV LANG C.UTF-8
 RUN set -x; \
         apt-get update \
         && apt-get install -y --no-install-recommends \
-            libjpeg62-turbo-dev \
+            libjpeg-dev \
             ca-certificates \
             curl \
             wait-for-it \
