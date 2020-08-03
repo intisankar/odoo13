@@ -7,9 +7,7 @@ ENV LANG C.UTF-8
 RUN set -x; \
         apt-get update \
         && apt-get install -y --no-install-recommends \
-            libarmadillo-dev libhdf4-alt-dev \
-            libhdf5-dev libjpeg-dev libjpeg-turbo8-dev \
-            libjpeg8-dev libmlpack-dev libnetcdf-dev libtiff5-dev \
+            libjpeg62-turbo-dev \
             ca-certificates \
             curl \
             wait-for-it \
