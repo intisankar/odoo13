@@ -1,87 +1,130 @@
-FROM ubuntu
+FROM ubuntu:18.04
+MAINTAINER Sankar Inti <intisankar3@gmail.com>
 
-# Generate locale C.UTF-8 for postgres and general locale data
-ENV LANG C.UTF-8
+RUN echo 'APT::Get::Assume-Yes "true";' >> /etc/apt/apt.conf
+RUN apt-get update \
+    && apt-get install sudo gnupg language-pack-es -y \
+    && locale-gen "en_US.UTF-8" "fr_FR.UTF-8"
+ENV LANG="en_US.UTF-8" LANGUAGE="en_US.UTF-8" LC_ALL="en_US.UTF-8" \
+    PYTHONIOENCODING="UTF-8" TERM="xterm" DEBIAN_FRONTEND="noninteractive"
+RUN apt-get update -q && apt-get upgrade -q && \
+    apt-get install --allow-unauthenticated -q \
+    wget
+RUN echo 'deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main' >> /etc/apt/sources.list.d/pgdg.list && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
+    sudo apt-key add -
+RUN echo 'deb http://security.ubuntu.com/ubuntu xenial-security main' >> /etc/apt/sources.list
+RUN apt-get update -q && apt-get upgrade -q && \
+    apt-get install --allow-unauthenticated -q \
+        aptitude \
+        build-essential \
+        curl \
+        fontconfig \
+        git \
+        libevent-dev \
+        libfontconfig1 \
+        libjpeg-turbo8 \
+        libldap2-dev \
+        libpng12-0 \
+        libsasl2-dev \
+        libssl1.0-dev \
+        libxml2-dev \
+        libxrender1 \
+        libxslt-dev \
+        nano \
+        node-gyp \
+        node-less \
+        nodejs \
+        nodejs-dev \
+        npm \
+        openssh-server \
+        openssl \
+        openssl \
+        postgresql-11 \
+        postgresql-client-11 \
+        postgresql-contrib-11 \
+        postgresql-server-dev-11 \
+        python3 \
+        python3-dev \
+        python3-pip \
+        swig \
+        xmlstarlet \
+        xsltproc \
+        xz-utils \
+        libpq-dev \
+        libxslt1-dev \
+        python3-setuptools \
+        python3-wheel \
+        xfonts-75dpi \
+        xfonts-base
 
-# Install some deps, lessc and less-plugin-clean-css, and wkhtmltopdf
-RUN set -x; \
-        apt-get update \
-        && apt-get install -y --no-install-recommends \
-            libjpeg-dev \
-            ca-certificates \
-            curl \
-            wait-for-it \
-            dirmngr \
-            fonts-noto-cjk \
-            gnupg \
-            libssl-dev \
-            node-less \
-            npm \
-            python3-num2words \
-            python3-pip \
-            python3-phonenumbers \
-            python3-pyldap \
-            python3-qrcode \
-            python3-renderpm \
-            python3-setuptools \
-            python3-vobject \
-            python3-watchdog \
-            python3-xlwt \
-            xz-utils \
-        && curl -o wkhtmltox.deb -sSL https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.stretch_amd64.deb \
-        && echo '7e35a63f9db14f93ec7feeb0fce76b30c08f2057 wkhtmltox.deb' | sha1sum -c - \
-        && apt-get -f install -y --no-install-recommends ./wkhtmltox.deb \
-        && rm -rf /var/lib/apt/lists/* wkhtmltox.deb
+# Install wkhtmltopdf
+RUN cd /tmp && \
+    wget https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.5/wkhtmltox_0.12.5-1.bionic_amd64.deb \
+    && dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
 
-# install latest postgresql-client
-RUN set -x; \
-        echo 'deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main' > etc/apt/sources.list.d/pgdg.list \
-        && export GNUPGHOME="$(mktemp -d)" \
-        && repokey='B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8' \
-        && gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "${repokey}" \
-        && gpg --batch --armor --export "${repokey}" > /etc/apt/trusted.gpg.d/pgdg.gpg.asc \
-        && gpgconf --kill all \
-        && rm -rf "$GNUPGHOME" \
-        && apt-get update  \
-        && apt-get install -y postgresql-client \
-        && rm -rf /var/lib/apt/lists/*
+# Download and install odoo requirements from github.com/odoo/odoo/requirements.txt
+RUN cd /tmp && \
+    wget -q https://raw.githubusercontent.com/odoo/odoo/13.0/requirements.txt && \
+    pip3 install -r requirements.txt && pip3 install --upgrade pip
 
-# Install rtlcss (on Debian buster)
-RUN set -x; \
-    npm install -g rtlcss
+#Python Libraries
+RUN pip3 install vobject qrcode pyldap num2words 
 
-# Install Odoo
-ENV ODOO_VERSION 13.0
-ARG ODOO_RELEASE=20191009
-ARG ODOO_SHA=468633ffd7ebacdde116e8708fd62f74788cd2b1
-RUN set -x; \
-        curl -o odoo.deb -sSL http://nightly.odoo.com/${ODOO_VERSION}/nightly/deb/odoo_${ODOO_VERSION}.${ODOO_RELEASE}_all.deb \
-        && echo "${ODOO_SHA} odoo.deb" | sha1sum -c - \
-        && dpkg --force-depends -i odoo.deb \
-        && apt-get update \
-        && apt-get -y install -f --no-install-recommends \
-        && rm -rf /var/lib/apt/lists/* odoo.deb
+# Cleanup
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* && rm -rf /tmp/*
 
-# Copy entrypoint script and Odoo configuration file
-COPY ./entrypoint.sh /
-RUN chmod 777 /entrypoint.sh
-COPY ./odoo.conf /etc/odoo/
-RUN chown odoo /etc/odoo/odoo.conf
+# Add ODOO user
+RUN adduser --home=/home/odoo-13.0/ --disabled-password --gecos "" --shell=/bin/bash odoo
+RUN echo 'root:odoo**' | chpasswd 
+RUN echo "odoo ALL=(root) NOPASSWD:ALL" | tee -a /etc/sudoers.d/user && \
+    chmod 0440 /etc/sudoers.d/user
 
-# Mount /var/lib/odoo to allow restoring filestore and /mnt/extra-addons for users addons
-RUN mkdir -p /mnt/extra-addons \
-        && chown -R odoo /mnt/extra-addons
-VOLUME ["/var/lib/odoo", "/mnt/extra-addons"]
+# Create odoo-server.conf
+ADD odoo-server.conf /home/odoo-13.0/odoo-server.conf
+RUN chown odoo /home/odoo-13.0/odoo-server.conf && \
+    chmod +x /home/odoo-13.0/odoo-server.conf
 
-# Expose Odoo services
-EXPOSE 8069 8071
+#Install Odoo
+RUN cd /home/odoo-13.0/ && git clone -b 13.0 --single-branch --depth=1 https://github.com/odoo/odoo.git odoo
+RUN chmod +x /home/odoo-13.0/odoo
+RUN mkdir -p /home/odoo-13.0/.local/share/Odoo/filestore && \
+    chown -R odoo:odoo /home/odoo-13.0/.local/share/Odoo/filestore
 
-# Set the default config file
-ENV ODOO_RC /etc/odoo/odoo.conf
+#Odoo Log
+RUN mkdir -p /home/odoo-13.0/.local/log/Odoo && \
+    touch /home/odoo-13.0/.local/log/Odoo/odoo-server.log && \
+    chown odoo: -R /home/odoo-13.0/.local/log/Odoo && \
+    chmod -R 777 /home/odoo-13.0/.local/log/Odoo/odoo-server.log
 
-# Set default user when running the container
+RUN mkdir -p /home/odoo-13.0/extra-addons \
+        && chown -R odoo:odoo /home/odoo-13.0/extra-addons && \
+        chown -R odoo:odoo /home/odoo-13.0/
+VOLUME ["/home/odoo-13.0/"]
+
+# Add entrypoint file and give execute permission
+ADD ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Correct error with ssl-cert permissions for Postgres
+RUN mkdir /etc/ssl/private-copy && \
+    mv /etc/ssl/private/* /etc/ssl/private-copy/ && \
+    rm -r /etc/ssl/private && \
+    mv /etc/ssl/private-copy /etc/ssl/private && \
+    chmod -R 0700 /etc/ssl/private && \
+    chown -R postgres /etc/ssl/private
+
+USER postgres
+
+# Run Postgres Server
+RUN /etc/init.d/postgresql start && \
+    psql --command "CREATE USER odoo WITH SUPERUSER PASSWORD 'odoo';"
+
 USER odoo
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["odoo"]
+CMD /entrypoint.sh
 
+EXPOSE 8069
+EXPOSE 8072
+EXPOSE 22
+EXPOSE 5432
