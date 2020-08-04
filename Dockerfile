@@ -57,7 +57,7 @@ RUN apt-get update -q && apt-get upgrade -q && \
         python3-wheel \
         xfonts-75dpi \
         xfonts-base \
-        psycopg2-binary
+        python-psycopg2
 
 # Install wkhtmltopdf
 RUN cd /tmp && \
