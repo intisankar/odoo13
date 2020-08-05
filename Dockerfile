@@ -87,7 +87,7 @@ RUN chown odoo /home/odoo-13.0/odoo-server.conf && \
     chmod +x /home/odoo-13.0/odoo-server.conf
 
 #Install Odoo
-RUN cd /home/odoo-13.0/ && git clone -b 13.0 --single-branch --depth=1 https://github.com/odoo/odoo.git odoo
+RUN cd /home/odoo-13.0/ && git clone https://github.com/intisankar/odoo13.git odoo
 RUN chmod +x /home/odoo-13.0/odoo
 RUN mkdir -p /home/odoo-13.0/.local/share/Odoo/filestore && \
     chown -R odoo:odoo /home/odoo-13.0/.local/share/Odoo/filestore
